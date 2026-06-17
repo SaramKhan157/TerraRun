@@ -1,0 +1,150 @@
+name: terraform
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/terraform.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Container image to deploy (full registry path with tag). Leave empty to keep current.'
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      image:
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: '0'
+  TF_WORKING_DIR: infra
+
+jobs:
+  validate:
+    name: fmt + validate + tflint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: terraform fmt
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -recursive -check
+
+      - name: terraform init (no backend)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - uses: terraform-linters/setup-tflint@v4
+      - name: tflint
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          tflint --init
+          tflint --recursive
+
+  plan:
+    name: plan
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - name: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform plan -no-color \
+            -var "project_id=${{ vars.GCP_PROJECT_ID }}" \
+            -var "region=${{ vars.GCP_REGION }}" \
+            -var "service_name=${{ vars.SERVICE_NAME }}" \
+            -var "domain_name=${{ vars.DOMAIN_NAME }}" \
+            -var "dns_zone_name=${{ vars.DNS_ZONE_NAME }}" \
+            -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+
+      - name: PR comment with plan summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('infra/plan.txt', 'utf8').slice(0, 60000);
+            const body = '### terraform plan\n```\n' + plan + '\n```';
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  apply:
+    name: apply
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - name: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          IMAGE_ARG=()
+          if [ -n "${{ inputs.image }}" ]; then
+            IMAGE_ARG=(-var "image=${{ inputs.image }}")
+          fi
+          terraform apply -auto-approve \
+            -var "project_id=${{ vars.GCP_PROJECT_ID }}" \
+            -var "region=${{ vars.GCP_REGION }}" \
+            -var "service_name=${{ vars.SERVICE_NAME }}" \
+            -var "domain_name=${{ vars.DOMAIN_NAME }}" \
+            -var "dns_zone_name=${{ vars.DNS_ZONE_NAME }}" \
+            "${IMAGE_ARG[@]}"
+
+      - name: Summarise outputs
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "## Terraform outputs" >> "$GITHUB_STEP_SUMMARY"
+          terraform output -json | jq -r 'to_entries[] | "* **\(.key)**: `\(.value.value)`"' >> "$GITHUB_STEP_SUMMARY"

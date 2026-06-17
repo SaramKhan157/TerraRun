@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TerraRun</title>
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --surface: #131418;
+    --surface-2: #1b1d23;
+    --border: #2a2d36;
+    --text: #e6e8ee;
+    --muted: #8a8f9c;
+    --accent: #4ade80;
+    --accent-glow: rgba(74, 222, 128, 0.15);
+    --link: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    background:
+      radial-gradient(800px 600px at 70% -10%, rgba(74, 222, 128, 0.08), transparent 70%),
+      radial-gradient(700px 500px at 10% 100%, rgba(96, 165, 250, 0.08), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    line-height: 1.5;
+  }
+  .card {
+    width: 100%;
+    max-width: 560px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.6);
+  }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    background: var(--accent-glow);
+    border: 1px solid rgba(74, 222, 128, 0.25);
+    padding: 4px 10px;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  .status::before {
+    content: "";
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  h1 {
+    margin: 0 0 8px 0;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 24px 0;
+    font-size: 15px;
+  }
+  .meta {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+    font-size: 13px;
+  }
+  .meta dt {
+    color: var(--muted);
+    font-weight: 500;
+  }
+  .meta dd {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: var(--text);
+  }
+  .links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .links a {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color 120ms ease, transform 120ms ease;
+  }
+  .links a:hover {
+    border-color: var(--link);
+    transform: translateY(-1px);
+  }
+  .links .endpoint {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    color: var(--link);
+  }
+  .links .desc {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .stack {
+    margin-top: 24px;
+  }
+  .stack-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 12px 0;
+    font-weight: 600;
+  }
+  .stack-group {
+    margin-bottom: 14px;
+  }
+  .stack-group:last-child { margin-bottom: 0; }
+  .stack-group-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 6px 0;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 12px;
+    color: var(--text);
+  }
+  .chip-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    opacity: 0.7;
+  }
+  .chip-dot.blue { background: var(--link); }
+  .chip-dot.purple { background: #a78bfa; }
+  .chip-dot.amber { background: #fbbf24; }
+  .footer {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .footer code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+</style>
+</head>
+<body>
+<main class="card">
+  <span class="status">Live</span>
+  <h1>TerraRun is live.</h1>
+  <p class="tagline">Node.js service on Cloud Run, fronted by a global HTTPS load balancer, deployed with Terraform.</p>
+
+  <dl class="meta">
+    <dt>Revision</dt><dd>{{REVISION}}</dd>
+    <dt>Region</dt><dd>{{REGION}}</dd>
+    <dt>Runtime</dt><dd>node 20 · distroless</dd>
+  </dl>
+
+  <div class="links">
+    <a href="/health">
+      <span class="endpoint">GET /health</span>
+      <span class="desc">Liveness probe — returns {"status":"ok"}</span>
+    </a>
+    <a href="/api/info">
+      <span class="endpoint">GET /api/info</span>
+      <span class="desc">Service metadata as JSON</span>
+    </a>
+    <a href="/api/time">
+      <span class="endpoint">GET /api/time</span>
+      <span class="desc">Current server time</span>
+    </a>
+  </div>
+
+  <section class="stack">
+    <p class="stack-title">Built with</p>
+
+    <div class="stack-group">
+      <p class="stack-group-label">Compute &amp; deploy</p>
+      <div class="chips">
+        <span class="chip"><span class="chip-dot"></span>Cloud Run</span>
+        <span class="chip"><span class="chip-dot"></span>Artifact Registry</span>
+        <span class="chip"><span class="chip-dot"></span>Cloud Build</span>
+        <span class="chip"><span class="chip-dot"></span>Docker · distroless</span>
+      </div>
+    </div>
+
+    <div class="stack-group">
+      <p class="stack-group-label">Network &amp; security</p>
+      <div class="chips">
+        <span class="chip"><span class="chip-dot blue"></span>Global HTTPS Load Balancer</span>
+        <span class="chip"><span class="chip-dot blue"></span>Serverless NEG</span>
+        <span class="chip"><span class="chip-dot blue"></span>Cloud DNS</span>
+        <span class="chip"><span class="chip-dot blue"></span>Managed SSL Certs</span>
+        <span class="chip"><span class="chip-dot blue"></span>IAM · Workload Identity Federation</span>
+      </div>
+    </div>
+
+    <div class="stack-group">
+      <p class="stack-group-label">Infrastructure &amp; ops</p>
+      <div class="chips">
+        <span class="chip"><span class="chip-dot purple"></span>Terraform</span>
+        <span class="chip"><span class="chip-dot purple"></span>Cloud Storage · TF state</span>
+        <span class="chip"><span class="chip-dot purple"></span>Secret Manager</span>
+        <span class="chip"><span class="chip-dot amber"></span>GitHub Actions</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="footer">
+    <span>Cloud Run · europe-west2</span>
+    <span><code>cr.saram-khan.site</code></span>
+  </div>
+</main>
+</body>
+</html>

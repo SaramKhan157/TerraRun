@@ -1,0 +1,92 @@
+name: build-and-push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/build-and-push.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Override image tag (defaults to commit SHA).'
+        required: false
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: false
+        type: string
+    outputs:
+      image:
+        description: 'Fully qualified image reference pushed by this run.'
+        value: ${{ jobs.build.outputs.image }}
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  AR_REPO: ${{ vars.AR_REPO }}
+  SERVICE_NAME: ${{ vars.SERVICE_NAME }}
+
+jobs:
+  build:
+    name: Build, test, push
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install + test
+        working-directory: app
+        run: |
+          npm ci || npm install
+          npm test --if-present
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure docker auth
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - id: image
+        name: Compute image ref
+        run: |
+          TAG="${{ inputs.tag }}"
+          if [ -z "$TAG" ]; then TAG="sha-${GITHUB_SHA::12}"; fi
+          IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${AR_REPO}/${SERVICE_NAME}:${TAG}"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"     >> "$GITHUB_OUTPUT"
+          echo "## Build" >> "$GITHUB_STEP_SUMMARY"
+          echo "* image: \`$IMAGE\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image }}
+            ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ env.SERVICE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

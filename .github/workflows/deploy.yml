@@ -1,0 +1,56 @@
+name: deploy
+
+# Stitches the build and terraform pipelines together: builds the image,
+# applies Terraform with the new image, then runs a post-deploy health probe.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag override (defaults to commit SHA).'
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'Dockerfile'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-and-push.yml
+    secrets: inherit
+    with:
+      tag: ${{ inputs.tag }}
+
+  deploy:
+    needs: build
+    uses: ./.github/workflows/terraform.yml
+    secrets: inherit
+    with:
+      image: ${{ needs.build.outputs.image }}
+
+  smoke:
+    name: post-deploy health check
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: curl /health
+        env:
+          DOMAIN: ${{ vars.DOMAIN_NAME }}
+        run: |
+          set -euo pipefail
+          URL="https://${DOMAIN}/health"
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i: $URL"
+            if curl -fsS --max-time 10 "$URL" | tee /tmp/out.json; then
+              status=$(jq -r .status /tmp/out.json)
+              [ "$status" = "ok" ] && exit 0
+            fi
+            sleep $((i*5))
+          done
+          echo "Health check failed" >&2
+          exit 1

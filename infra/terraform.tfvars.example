@@ -1,0 +1,7 @@
+project_id    = "your-gcp-project-id"
+region        = "europe-west2"
+service_name  = "terrarun-app"
+domain_name   = "cr.example.com"
+dns_zone_name = "example-com"   # existing google_dns_managed_zone name
+# image is left empty for the first apply; CI replaces it on each deploy.
+# image = "europe-west2-docker.pkg.dev/your-gcp-project-id/terrarun-app/terrarun-app:sha-abc123"

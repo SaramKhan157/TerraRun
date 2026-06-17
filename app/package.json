@@ -1,0 +1,19 @@
+{
+  "name": "terrarun-app",
+  "version": "1.0.0",
+  "description": "Sample Node.js service for Cloud Run deployment",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "license": "MIT"
+}

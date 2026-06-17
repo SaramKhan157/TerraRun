@@ -1,0 +1,44 @@
+## Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+coverage/
+dist/
+
+## Terraform
+**/.terraform/
+**/.terraform.lock.hcl.bak
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+.terraformrc
+terraform.rc
+
+## Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+## OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Terraform plan output (literal filename, no extension)
+tfplan
+**/tfplan
