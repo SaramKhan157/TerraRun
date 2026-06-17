@@ -7,3 +7,8 @@ variable "labels" {
   type    = map(string)
   default = {}
 }
+variable "enable_cloud_armor" {
+  type        = bool
+  default     = true
+  description = "Attach a Cloud Armor policy (rate limit + OWASP SQLi/XSS) to the backend service."
+}

@@ -15,5 +15,10 @@ output "load_balancer_ip" {
 
 output "service_url" {
   description = "Public HTTPS URL served by the load balancer."
-  value       = "https://${var.domain_name}"
+  value       = "https://${local.effective_domain}"
+}
+
+output "workspace" {
+  description = "Active Terraform workspace (default = prod, anything else = named env like staging)."
+  value       = terraform.workspace
 }

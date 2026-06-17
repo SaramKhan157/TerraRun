@@ -51,3 +51,9 @@ variable "labels" {
     managed = "terraform"
   }
 }
+
+variable "enable_cloud_armor" {
+  description = "Attach a Cloud Armor policy to the load balancer backend."
+  type        = bool
+  default     = true
+}

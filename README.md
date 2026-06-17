@@ -260,6 +260,89 @@ gcloud iam service-accounts add-iam-policy-binding "$SA" \
 
 ---
 
+## Bonus: Cloud Armor
+
+The load balancer's backend service is fronted by a Cloud Armor security policy with three rules:
+
+| Priority | Rule | Action |
+|---|---|---|
+| 1000 | Rate limit — 100 req/min per IP | `rate_based_ban` for 10 min on breach |
+| 1100 | OWASP CRS SQL injection (`sqli-v33-stable`) | `deny(403)` |
+| 1200 | OWASP CRS XSS (`xss-v33-stable`) | `deny(403)` |
+| `2147483647` | Default | `allow` |
+
+The policy is attached automatically when `enable_cloud_armor = true` (the default). To disable, set the variable to `false` in `terraform.tfvars`. Cost is roughly $5/month base + $0.75/rule.
+
+Smoke-test the rate limit from a terminal:
+
+```bash
+# Should return 200 for a while, then 429 as the policy bans the IP
+for i in {1..200}; do
+  curl -s -o /dev/null -w "%{http_code}\n" https://cr.saram-khan.site/health
+done | sort | uniq -c
+```
+
+You should see mostly `200`s followed by `429`s once the per-minute threshold is crossed.
+
+---
+
+## Bonus: staging environment via Terraform workspaces
+
+The same Terraform deploys to a parallel staging environment when run in a non-default workspace. The `default` workspace stays as prod — exactly what's described above. Any other workspace gets a `-<workspace>` suffix on every resource name and serves on `<workspace>.cr.saram-khan.site` instead of the apex.
+
+How the wiring works (in `infra/main.tf`):
+
+```hcl
+locals {
+  is_default_workspace = terraform.workspace == "default"
+  name_suffix          = local.is_default_workspace ? "" : "-${terraform.workspace}"
+  effective_service    = "${var.service_name}${local.name_suffix}"
+  effective_domain     = local.is_default_workspace ? var.domain_name : "${terraform.workspace}.${var.domain_name}"
+}
+```
+
+So in workspace `staging`, the service is `terrarun-app-staging`, the LB IP is `terrarun-app-staging-ip`, the SSL cert covers `staging.cr.saram-khan.site`, and the DNS A record points to a separate static IP.
+
+### Spinning up the staging env
+
+```bash
+cd infra
+terraform workspace new staging
+terraform workspace select staging
+
+# Same backend bucket, but workspace state is automatically isolated.
+terraform init -backend-config="bucket=terrarun-499611-tfstate"
+
+terraform apply \
+  -var "project_id=terrarun-499611" \
+  -var "region=europe-west2" \
+  -var "domain_name=cr.saram-khan.site" \
+  -var "dns_zone_name=cr-saram-khan-site" \
+  -var "image=europe-west2-docker.pkg.dev/terrarun-499611/terrarun-app/terrarun-app:v4"
+```
+
+After ~3–5 minutes plus SSL cert provisioning time, `https://staging.cr.saram-khan.site` is live alongside prod. State files live at `gs://terrarun-499611-tfstate/terrarun/state/staging.tfstate` (vs prod's `default.tfstate`), so the environments never step on each other.
+
+### Switching back to prod
+
+```bash
+terraform workspace select default
+terraform apply ...   # touches prod again
+```
+
+### Tear down just the staging env
+
+```bash
+terraform workspace select staging
+terraform destroy ...
+terraform workspace select default
+terraform workspace delete staging
+```
+
+Prod is untouched.
+
+---
+
 ## Notes to my future self
 
 - **The hardest debugging moment** was getting the SSL cert to provision. Symptom: `gcloud compute ssl-certificates describe ... --global` shows `FAILED_NOT_VISIBLE`. Almost always means the A record isn't actually resolvable from the public internet yet — either DNS hasn't propagated, or the delegation chain (parent zone → child zone) is broken. `dig cr.<domain> +trace` from a different network is the fastest way to confirm.
@@ -271,10 +354,20 @@ gcloud iam service-accounts add-iam-policy-binding "$SA" \
 
 ## Screenshots
 
-In `docs/screenshots/`:
+Captured during the build-out and kept in [`docs/screenshots/`](docs/screenshots/):
 
-* `docker-run.png` — the container running locally with a successful `/health` curl
-* `cloud-run.png` — the Cloud Run service in the console
-* `load-balancer.png` — LB frontend with the managed cert showing `ACTIVE`
-* `live-https.png` — browser hitting `https://cr.saram-khan.site`
-* `github-actions.png` — green deploy pipeline run
+| File | What it shows |
+|---|---|
+| `01-cloud-run-service.png` | The `terrarun-app` Cloud Run service in the GCP console — revision list, ingress set to "Internal and Cloud Load Balancing", region `europe-west2`. |
+| `02-artifact-registry.png` | Artifact Registry repo `terrarun-app` with the pushed image tags (`v1`–`v4`, plus the per-commit `sha-*` tags from CI). |
+| `03-load-balancer.png` | Network services → Load balancing → `terrarun-app-https` showing the static IP `8.232.255.125`, the managed SSL cert in `ACTIVE`, and the serverless NEG backend. |
+| `04-managed-ssl-cert.png` | Certificate Manager view of `terrarun-app-cert` — provisioned for `cr.saram-khan.site`, status `ACTIVE`. |
+| `05-cloud-dns.png` | Cloud DNS zone `cr-saram-khan-site` with the A record `cr.saram-khan.site → 8.232.255.125`. |
+| `06-route53-delegation.png` | AWS Route 53 hosted zone `saram-khan.site` with the NS record for `cr` pointing to the four `ns-cloud-e*.googledomains.com` nameservers. |
+| `07-live-site.png` | Browser hitting `https://cr.saram-khan.site` — the dark landing page with revision/region and the "Built with" chips. |
+| `08-pretty-api-endpoint.png` | Browser hitting `https://cr.saram-khan.site/api/info` — same theme, JSON rendered with syntax highlighting (browsers get HTML; curl gets raw JSON). |
+| `09-github-actions-deploy-green.png` | `deploy` workflow run #6 — all four jobs green: `build` → `fmt+validate+tflint` → `apply` → `post-deploy health check`. |
+| `10-github-actions-variables.png` | GitHub repo Settings → Actions → Variables showing the 9 repository variables that drive CI. |
+| `11-iam-deployer-sa-roles.png` | GCP IAM page filtered to `terrarun-deployer@…` showing the 11 roles + WIF binding. |
+
+To reproduce: take the screenshots from the same surfaces in your own setup, save them in `docs/screenshots/` with the filenames above, and they'll render in this section automatically when viewed on GitHub.

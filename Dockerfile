@@ -5,7 +5,7 @@ FROM node:20-alpine AS builder
 WORKDIR /build
 
 COPY app/package*.json ./
-RUN npm install --omit=dev --no-audit --no-fund
+RUN npm ci --omit=dev --no-audit --no-fund
 
 COPY app/ ./
 
