@@ -39,6 +39,12 @@ Thumbs.db
 .idea/
 *.swp
 
+## Agent / assistant local config
+.claude/
+.cursor/
+.continue/
+.copilot/
+
 # Terraform plan output (literal filename, no extension)
 tfplan
 **/tfplan
