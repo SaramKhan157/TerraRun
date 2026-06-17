@@ -32,18 +32,15 @@ terraform.rc
 *.pem
 *.key
 
-## OS / editor
+## OS / editor / local tool overrides
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
-*.swp
-
-## Agent / assistant local config
-.claude/
 .cursor/
 .continue/
 .copilot/
+*.swp
 
 # Terraform plan output (literal filename, no extension)
 tfplan
