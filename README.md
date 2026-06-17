@@ -228,9 +228,9 @@ gcloud iam service-accounts create terrarun-deployer \
 SA=terrarun-deployer@${PROJECT_ID}.iam.gserviceaccount.com
 
 for role in roles/run.admin roles/artifactregistry.writer roles/iam.serviceAccountUser \
-            roles/compute.loadBalancerAdmin roles/compute.networkAdmin \
+            roles/compute.loadBalancerAdmin roles/compute.networkAdmin roles/compute.securityAdmin \
             roles/dns.admin roles/storage.objectAdmin roles/serviceusage.serviceUsageAdmin \
-            roles/certificatemanager.editor roles/cloudbuild.builds.editor; do
+            roles/certificatemanager.editor roles/cloudbuild.builds.editor roles/browser; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:${SA}" --role="$role"
 done
 
