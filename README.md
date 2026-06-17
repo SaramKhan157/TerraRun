@@ -21,27 +21,7 @@ Nothing fancy on the app side — the interesting bits are the infrastructure.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    user[User] -->|HTTPS<br/>cr.saram-khan.site| dns[Cloud DNS<br/>A record]
-    dns --> ip[Static external IP]
-    ip --> https[HTTPS forwarding rule<br/>:443]
-    ip --> http[HTTP forwarding rule<br/>:80]
-    http -->|301 redirect| https
-    https --> proxy[Target HTTPS proxy<br/>+ managed SSL cert]
-    proxy --> urlmap[URL map]
-    urlmap --> backend[Backend service]
-    backend --> neg[Serverless NEG]
-    neg --> run[Cloud Run service<br/>:8080 distroless container]
-    run --> ar[(Artifact Registry<br/>image repo)]
-
-    subgraph CICD[GitHub Actions]
-        gha1[build-and-push] --> gha2[terraform apply]
-        gha2 --> gha3[/health smoke test]
-    end
-    CICD -.->|WIF, no static keys| run
-    CICD -.->|push image| ar
-```
+![Architecture](docs/screenshots/architecture.png)
 
 ### AWS → GCP mapping (for my own reference)
 
@@ -354,20 +334,59 @@ Prod is untouched.
 
 ## Screenshots
 
-Captured during the build-out and kept in [`docs/screenshots/`](docs/screenshots/):
+Captured during the build-out — kept in [`docs/screenshots/`](docs/screenshots/).
 
-| File | What it shows |
-|---|---|
-| `01-cloud-run-service.png` | The `terrarun-app` Cloud Run service in the GCP console — revision list, ingress set to "Internal and Cloud Load Balancing", region `europe-west2`. |
-| `02-artifact-registry.png` | Artifact Registry repo `terrarun-app` with the pushed image tags (`v1`–`v4`, plus the per-commit `sha-*` tags from CI). |
-| `03-load-balancer.png` | Network services → Load balancing → `terrarun-app-https` showing the static IP `8.232.255.125`, the managed SSL cert in `ACTIVE`, and the serverless NEG backend. |
-| `04-managed-ssl-cert.png` | Certificate Manager view of `terrarun-app-cert` — provisioned for `cr.saram-khan.site`, status `ACTIVE`. |
-| `05-cloud-dns.png` | Cloud DNS zone `cr-saram-khan-site` with the A record `cr.saram-khan.site → 8.232.255.125`. |
-| `06-route53-delegation.png` | AWS Route 53 hosted zone `saram-khan.site` with the NS record for `cr` pointing to the four `ns-cloud-e*.googledomains.com` nameservers. |
-| `07-live-site.png` | Browser hitting `https://cr.saram-khan.site` — the dark landing page with revision/region and the "Built with" chips. |
-| `08-pretty-api-endpoint.png` | Browser hitting `https://cr.saram-khan.site/api/info` — same theme, JSON rendered with syntax highlighting (browsers get HTML; curl gets raw JSON). |
-| `09-github-actions-deploy-green.png` | `deploy` workflow run #6 — all four jobs green: `build` → `fmt+validate+tflint` → `apply` → `post-deploy health check`. |
-| `10-github-actions-variables.png` | GitHub repo Settings → Actions → Variables showing the 9 repository variables that drive CI. |
-| `11-iam-deployer-sa-roles.png` | GCP IAM page filtered to `terrarun-deployer@…` showing the 11 roles + WIF binding. |
+### 01 — Cloud Run service
+The `terrarun-app` Cloud Run service in the GCP console — revision list, ingress set to "Internal and Cloud Load Balancing", region `europe-west2`.
 
-To reproduce: take the screenshots from the same surfaces in your own setup, save them in `docs/screenshots/` with the filenames above, and they'll render in this section automatically when viewed on GitHub.
+![Cloud Run service](docs/screenshots/01-cloud-run-service.png)
+
+### 02 — Artifact Registry
+Artifact Registry repo `terrarun-app` with the pushed image tags (`v1`–`v4`, plus the per-commit `sha-*` tags from CI).
+
+![Artifact Registry](docs/screenshots/02-artifact-registry.png)
+
+### 03 — Load balancer details
+Network services → Load balancing → `terrarun-app-https` showing the static IP `8.232.255.125`, the managed SSL cert, and the serverless NEG backend.
+
+![Load balancer](docs/screenshots/03-load-balancer.png)
+
+### 04 — HTTPS forwarding rule
+The HTTPS forwarding rule `terrarun-app-https-fr` — static IP `8.232.255.125`, port 443, premium tier, with the Terraform labels (`app:terrarun`, `managed:terraform`).
+
+![HTTPS forwarding rule](docs/screenshots/04-forwarding-rule.png)
+
+### 05 — Cloud DNS zone
+Cloud DNS zone `cr-saram-khan-site` with the A record `cr.saram-khan.site → 8.232.255.125` alongside the SOA/NS records.
+
+![Cloud DNS zone](docs/screenshots/05-cloud-dns.png)
+
+### 06 — Route 53 subdomain delegation
+AWS Route 53 hosted zone `saram-khan.site` with the NS record for `cr` pointing to the four `ns-cloud-e*.googledomains.com` nameservers — the delegation that hands `cr.*` from AWS over to GCP.
+
+![Route 53 delegation](docs/screenshots/06-route53-delegation.png)
+
+### 07 — Live site
+Browser hitting `https://cr.saram-khan.site` — the dark landing page with revision/region and the "Built with" chips.
+
+![Live site](docs/screenshots/07-live-site.png)
+
+### 08 — Pretty API endpoint
+Browser hitting `https://cr.saram-khan.site/api/info` — same theme, JSON rendered with syntax highlighting. The same URL returns raw JSON to `curl` thanks to content negotiation on the `Accept` header.
+
+![Pretty API endpoint](docs/screenshots/08-pretty-api-endpoint.png)
+
+### 09 — Green CI/CD deploy
+`deploy` workflow run — all four jobs green: `build` → `fmt+validate+tflint` → `apply` → `post-deploy health check`. The `deploy/plan` node is correctly skipped (plan only runs on PRs).
+
+![GitHub Actions deploy run](docs/screenshots/09-github-actions-deploy-green.png)
+
+### 10 — GitHub Actions Variables
+GitHub repo Settings → Actions → Variables showing the 9 repository variables that drive CI (project ID, region, WIF provider path, deployer SA, etc.).
+
+![GitHub Actions Variables](docs/screenshots/10-github-actions-variables.png)
+
+### 11 — IAM: deployer service account
+GCP IAM page filtered to `terrarun-deployer@…` — the 12 least-privilege roles bound to the SA that GitHub Actions impersonates via Workload Identity Federation. No JSON keys anywhere.
+
+![Deployer SA roles](docs/screenshots/11-iam-deployer-sa-roles.png)
