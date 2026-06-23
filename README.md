@@ -367,26 +367,36 @@ AWS Route 53 hosted zone `saram-khan.site` with the NS record for `cr` pointing 
 ![Route 53 delegation](docs/screenshots/06-route53-delegation.png)
 
 ### 07 — Live site
-Browser hitting `https://cr.saram-khan.site` — the dark landing page with revision/region and the "Built with" chips.
+Browser hitting `https://cr.saram-khan.site` — modern dark landing page with a "Live" status pill, animated gradient blobs in the background, the meta strip (revision / region / runtime), three feature cards for the endpoints (Heartbeat, Service info, Live clock) with hover popovers showing live mini-previews, and the "Built with" chips listing the full stack.
 
 ![Live site](docs/screenshots/07-live-site.png)
 
-### 08 — Pretty API endpoint
-Browser hitting `https://cr.saram-khan.site/api/info` — same theme, JSON rendered with syntax highlighting. The same URL returns raw JSON to `curl` thanks to content negotiation on the `Accept` header.
+### 08 — Heartbeat (`/health`)
+The `/health` page rendered as a heartbeat monitor — pulsing heart, scrolling EKG waveform, live uptime ticker, and stat tiles for revision and region. The same URL returns raw JSON (`{"status":"ok"}`) to `curl` thanks to content negotiation on the `Accept` header.
 
-![Pretty API endpoint](docs/screenshots/08-pretty-api-endpoint.png)
+![Heartbeat monitor](docs/screenshots/Heartbeat.png)
 
-### 09 — Green CI/CD deploy
+### 09 — Service info (`/api/info`)
+The `/api/info` page rendered as a service dashboard — animated hero card with the service name, then three icon tiles (Revision, Region, Runtime) summarising the Cloud Run identity. Same content negotiation: `curl` still gets raw JSON.
+
+![Service info dashboard](docs/screenshots/Service-info.png)
+
+### 10 — Live clock (`/api/time`)
+The `/api/time` page rendered as a live atomic clock — a 60-second progress ring that sweeps every minute, blinking colons, big digital display, and a three-column timezone strip (UTC, London, browser-local). `curl` to the same URL returns `{"now":"…ISO…"}`.
+
+![Live clock](docs/screenshots/Live-clock.png)
+
+### 11 — Green CI/CD deploy
 `deploy` workflow run — all four jobs green: `build` → `fmt+validate+tflint` → `apply` → `post-deploy health check`. The `deploy/plan` node is correctly skipped (plan only runs on PRs).
 
 ![GitHub Actions deploy run](docs/screenshots/09-github-actions-deploy-green.png)
 
-### 10 — GitHub Actions Variables
+### 12 — GitHub Actions Variables
 GitHub repo Settings → Actions → Variables showing the 9 repository variables that drive CI (project ID, region, WIF provider path, deployer SA, etc.).
 
 ![GitHub Actions Variables](docs/screenshots/10-github-actions-variables.png)
 
-### 11 — IAM: deployer service account
+### 13 — IAM: deployer service account
 GCP IAM page filtered to `terrarun-deployer@…` — the 12 least-privilege roles bound to the SA that GitHub Actions impersonates via Workload Identity Federation. No JSON keys anywhere.
 
 ![Deployer SA roles](docs/screenshots/11-iam-deployer-sa-roles.png)
